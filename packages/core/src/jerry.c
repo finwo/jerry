@@ -89,43 +89,52 @@ void jerry_route_post(struct http_parser_event *ev) {
 }
 
 void jerry_route_get(struct http_parser_event *ev) {
+  printf("ALIVE %d\n", __LINE__);
   struct hs_udata *hsdata = ev->udata;
   struct evio_conn *conn  = hsdata->connection;
+  printf("ALIVE %d\n", __LINE__);
 
   // Fetching the request
   // Has been wrapped in http_parser_event to support more features in the future
   struct http_parser_message *request  = ev->request;
   struct http_parser_message *response = ev->response;
   struct http_parser_header *header    = NULL;
+  printf("ALIVE %d\n", __LINE__);
 
   // Build response
   response->status = 200;
   http_parser_header_set(response, "Transfer-Encoding", "chunked"             );
   http_parser_header_set(response, "Content-Type"     , "application/x-ndjson");
+  printf("ALIVE %d\n", __LINE__);
 
   // Assign an empty body, we're not doing anything yet
   response->body     = strdup("");
   response->bodysize = 0;
+  printf("ALIVE %d\n", __LINE__);
 
   // Send response
   char *response_buffer = http_parser_sprint_response(response);
   evio_conn_write(conn, response_buffer, strlen(response_buffer));
   free(response_buffer);
+  printf("ALIVE %d\n", __LINE__);
 
   // Add the connection to listener list
   struct llistener *listener = malloc(sizeof(struct llistener));
   listener->conn = conn;
   listener->next = listeners;
   listeners      = listener;
+  printf("ALIVE %d\n", __LINE__);
 
   // Intentionally NOT closing the connection
 }
 
 void jerry_onClose(struct hs_udata *hsdata, void *udata) {
+  printf("ALIVE %d\n", __LINE__);
   struct evio_conn *conn = hsdata->connection;
 
   struct llistener *listener      = listeners;
   struct llistener *prev_listener = NULL;
+  printf("ALIVE %d\n", __LINE__);
 
   while(listener) {
     if (listener->conn == conn) {
@@ -140,6 +149,7 @@ void jerry_onClose(struct hs_udata *hsdata, void *udata) {
     prev_listener = listener;
     listener      = listener->next;
   }
+  printf("ALIVE %d\n", __LINE__);
 }
 
 void jerry_register(char *path) {
