@@ -1,6 +1,11 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "finwo/http-server.h"
 #include "finwo/http-parser.h"
 #include "kgabis/parson.h"
+#include "tidwall/evio.h"
 
 #include "jerry.h"
 
