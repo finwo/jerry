@@ -118,8 +118,12 @@ void jerry_route_get(struct http_parser_event *ev) {
 }
 
 void jerry_onClose(struct hs_udata *hsdata, void *udata) {
+  struct hs_udata *hsdata = ev->udata;
+  struct evio_conn *conn  = hsdata->connection;
+
   struct llistener *listener      = listeners;
   struct llistener *prev_listener = NULL;
+
   while(listener) {
     if (listener->conn == conn) {
       if (prev_listener) {
