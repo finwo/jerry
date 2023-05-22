@@ -17,7 +17,7 @@ build/$(TARGET)/lib:
 	cp package.ini build/$(TARGET)
 	cd $(shell dirname $@) && dep install
 
-build/$(TARGET)/$(BIN): build/$(TARGET)/Makefile
+build/$(TARGET)/$(BIN): build/$(TARGET)/Makefile build/$(TARGET)/src
 	cd $(shell dirname $@) && $(MAKE) $(BIN) "TARGET=$(TARGET)" "BIN=$(BIN)"
 
 .PHONY: clean
