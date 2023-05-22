@@ -9,7 +9,11 @@ Usage
 ### Basic usage
 
 ```
-jerry [--remote <hostname>:<port>] <listen-address>
+jerry [options]
+
+Options:
+  --remote address:port
+  --listen address:port
 ```
 
 ### Message structure
