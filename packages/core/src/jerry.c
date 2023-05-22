@@ -87,7 +87,6 @@ void jerry_route_get(struct http_parser_event *ev) {
   struct hs_udata *hsdata = ev->udata;
   struct evio_conn *conn  = hsdata->connection;
 
-
   // Fetching the request
   // Has been wrapped in http_parser_event to support more features in the future
   struct http_parser_message *request  = ev->request;
@@ -105,11 +104,11 @@ void jerry_route_get(struct http_parser_event *ev) {
 
   // Send response
   char *response_buffer = http_parser_sprint_response(response);
-  evio_conn_write(conndata->connection, response_buffer, strlen(response_buffer));
+  evio_conn_write(conn, response_buffer, strlen(response_buffer));
   free(response_buffer);
 
   // Add the connection to listener list
-  struct llistener *listener = malloc(sizeof(struct llist_conns));
+  struct llistener *listener = malloc(sizeof(struct llistener));
   listener->conn = conn;
   listener->next = listeners;
   listeners      = listener;
@@ -118,8 +117,7 @@ void jerry_route_get(struct http_parser_event *ev) {
 }
 
 void jerry_onClose(struct hs_udata *hsdata, void *udata) {
-  struct hs_udata *hsdata = ev->udata;
-  struct evio_conn *conn  = hsdata->connection;
+  struct evio_conn *conn = hsdata->connection;
 
   struct llistener *listener      = listeners;
   struct llistener *prev_listener = NULL;
