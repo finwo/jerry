@@ -21,6 +21,7 @@ void _jerry_respond_error(
   int status,
   const char *message
 ) {
+  struct http_parser_message *response = hsdata->reqres->response;
   response->status = status;
   http_parser_header_set(response, "Content-Type", "application/json");
   asprintf(&(response->body), "{\"ok\":false,\"message\":\"%s\"}", message);
@@ -36,6 +37,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
 
   struct llist_conns *listener;
   struct llist_conns *prev_listener = NULL;
+  char *response_buffer;
   char *chunk_json;
   char *chunk;
 
