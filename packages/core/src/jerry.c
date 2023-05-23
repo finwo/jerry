@@ -88,16 +88,15 @@ void jerry_route_post(struct http_parser_event *ev) {
   /* evio_conn_close(conndata->connection); */
 }
 
-void jerry_route_get(struct http_parser_event *ev) {
+void jerry_route_get(struct hs_udata *hsdata) {
   printf("ALIVE %d\n", __LINE__);
-  struct hs_udata *hsdata = ev->udata;
   struct evio_conn *conn  = hsdata->connection;
   printf("ALIVE %d\n", __LINE__);
 
   // Fetching the request
   // Has been wrapped in http_parser_event to support more features in the future
-  struct http_parser_message *request  = ev->request;
-  struct http_parser_message *response = ev->response;
+  struct http_parser_message *request  = hsdata->reqres->request;
+  struct http_parser_message *response = hsdata->reqres->response;
   struct http_parser_header *header    = NULL;
   printf("ALIVE %d\n", __LINE__);
 
