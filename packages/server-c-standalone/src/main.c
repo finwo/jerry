@@ -28,6 +28,10 @@ void route_404(struct hs_udata *reqdata) {
   return;
 }
 
+void jerry_svc_onClose(struct hs_udata *hsdata, void *udata) {
+  jerry_onClose(hsdata, udata);
+}
+
 int main(int argc, char *argv[]) {
   char *addr_intermediate = "localhost:4000";
   int i;
@@ -50,10 +54,12 @@ int main(int argc, char *argv[]) {
     .tick     = NULL,
     .serving  = onServing,
     .error    = NULL,
-    .close    = NULL,
+    .close    = jerry_svc_onClose,
     .notFound = route_404
   };
 
+
+  jerry_register("/api/v1/jerry");
   http_server_route("GET", "/hello", route_get_hello);
   http_server_main(addrs, sizeof(addrs) / sizeof(void*), &evs, NULL);
 
