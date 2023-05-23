@@ -35,8 +35,8 @@ void _jerry_respond_error(
 void jerry_route_post(struct hs_udata *hsdata) {
   struct evio_conn *conn = hsdata->connection;
 
-  struct llist_conns *listener;
-  struct llist_conns *prev_listener = NULL;
+  struct llistener *listener;
+  struct llistener *prev_listener = NULL;
   char *response_buffer;
   char *chunk_json;
   char *chunk;
