@@ -40,6 +40,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
   char *response_buffer;
   char *chunk_json;
   char *chunk;
+  int chunk_len;
 
   // Create easy references
   struct http_parser_message *request  = hsdata->reqres->request;
@@ -62,11 +63,12 @@ void jerry_route_post(struct hs_udata *hsdata) {
   asprintf(&chunk, "%x\r\n%s\n\r\n", strlen(chunk_json) + 1, chunk_json);
   json_value_free(jEvent);
   json_free_serialized_string(chunk_json);
+  chunk_len = strlen(chunk);
 
   // Dsitribute
   listener = listeners;
   while(listener) {
-    evio_conn_write(listener->conn, event_buffer, strlen(event_buffer));
+    evio_conn_write(listener->conn, chunk, chunk_len);
     prev_listener = listener;
     listener      = listener->next;
   }
