@@ -32,6 +32,29 @@ void _jerry_respond_error(
   evio_conn_close(hsdata->connection);
 }
 
+void jerry_route_options(struct hs_udata *hsdata) {
+  struct evio_conn *conn = hsdata->connection;
+
+  // Create easy references
+  struct http_parser_message *request  = hsdata->reqres->request;
+  struct http_parser_message *response = hsdata->reqres->response;
+
+  response->status = 200;
+  http_parser_header_set(response, "Allow"                       , "OPTIONS, GET, POST");
+  http_parser_header_set(response, "Access-Control-Allow-Methods", "OPTIONS, GET, POST");
+  http_parser_header_set(response, "Access-Control-Allow-Origin" , "*");
+  http_parser_header_set(response, "Access-Control-Allow-Headers", "Content-Type");
+  http_parser_header_set(response, "Connection"                  , "close");
+
+  // Send response
+  char *response_buffer = http_parser_sprint_response(response);
+  evio_conn_write(hsdata->connection, response_buffer, strlen(response_buffer));
+  free(response_buffer);
+
+  // Aanndd.. we're done
+  evio_conn_close(hsdata->connection);
+}
+
 void jerry_route_post(struct hs_udata *hsdata) {
   struct evio_conn *conn = hsdata->connection;
 
@@ -144,6 +167,7 @@ void jerry_onClose(struct hs_udata *hsdata, void *udata) {
 }
 
 void jerry_register(char *path) {
-  http_server_route("GET" , path, jerry_route_get);
-  http_server_route("POST", path, jerry_route_post);
+  http_server_route("GET"    , path, jerry_route_get);
+  http_server_route("POST"   , path, jerry_route_post);
+  http_server_route("OPTIONS", path, jerry_route_options);
 }
