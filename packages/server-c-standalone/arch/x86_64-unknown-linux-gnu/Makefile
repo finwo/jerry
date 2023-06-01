@@ -20,5 +20,7 @@ override CFLAGS+=$(INCLUDES)
 
 default: $(BIN)
 
+$(OBJ): $(SRC)
+
 $(BIN): $(OBJ)
 	$(CPP) $(LDFLAGS) $(OBJ) -o $@
