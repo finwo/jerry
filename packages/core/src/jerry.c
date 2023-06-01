@@ -39,10 +39,12 @@ void jerry_route_options(struct hs_udata *hsdata) {
   struct http_parser_message *request  = hsdata->reqres->request;
   struct http_parser_message *response = hsdata->reqres->response;
 
+  const char *origin = http_parser_header_get(request, "Origin");
+
   response->status = 200;
   http_parser_header_set(response, "Allow"                       , "OPTIONS, GET, POST");
   http_parser_header_set(response, "Access-Control-Allow-Methods", "OPTIONS, GET, POST");
-  http_parser_header_set(response, "Access-Control-Allow-Origin" , "*");
+  http_parser_header_set(response, "Access-Control-Allow-Origin" , origin ? origin : "*");
   http_parser_header_set(response, "Access-Control-Allow-Headers", "Content-Type");
   http_parser_header_set(response, "Connection"                  , "close");
 
