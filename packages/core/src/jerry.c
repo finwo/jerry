@@ -42,7 +42,6 @@ void jerry_route_options(struct hs_udata *hsdata) {
   const char *origin = http_parser_header_get(request, "Origin");
 
   response->status = 200;
-  http_parser_header_set(response, "Allow"                       , "OPTIONS, GET, POST");
   http_parser_header_set(response, "Access-Control-Allow-Methods", "OPTIONS, GET, POST");
   http_parser_header_set(response, "Access-Control-Allow-Origin" , origin ? origin : "*");
   http_parser_header_set(response, "Access-Control-Allow-Headers", "Content-Type");
@@ -102,8 +101,10 @@ void jerry_route_post(struct hs_udata *hsdata) {
   free(chunk);
 
   // Build response
+  const char *origin = http_parser_header_get(request, "Origin");
   response->status = 200;
-  http_parser_header_set(response, "Content-Type", "application/json");
+  http_parser_header_set(response, "Content-Type"                , "application/json"   );
+  http_parser_header_set(response, "Access-Control-Allow-Origin" , origin ? origin : "*");
   response->body     = strdup("{\"ok\":true}");
   response->bodysize = strlen(response->body);
 
@@ -125,9 +126,12 @@ void jerry_route_get(struct hs_udata *hsdata) {
   struct http_parser_message *response = hsdata->reqres->response;
 
   // Build response
+  const char *origin = http_parser_header_get(request, "Origin");
   response->status = 200;
-  http_parser_header_set(response, "Transfer-Encoding", "chunked"             );
-  http_parser_header_set(response, "Content-Type"     , "application/x-ndjson");
+  http_parser_header_set(response, "Transfer-Encoding"           , "chunked"             );
+  http_parser_header_set(response, "Content-Type"                , "application/x-ndjson");
+  http_parser_header_set(response, "Access-Control-Allow-Origin" , origin ? origin : "*" );
+
 
   // Assign an empty body, we're not doing anything yet
   response->body     = strdup("");
