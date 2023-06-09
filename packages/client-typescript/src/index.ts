@@ -1,6 +1,6 @@
 import { createSeed, KeyPair } from 'supercop';
 
-export type JerryListener = (body: JerryEventBody) => void;
+export type JerryListener = (body: JerryEventBody, pubkey?: string) => void;
 
 export type JerryEventBody = null | string | number | { [index:string]: JerryEventBody };
 
@@ -72,7 +72,7 @@ export class JerryClient {
 
           for(const listener of this.listeners) {
             try {
-              listener(data.bdy);
+              listener(data.bdy, data.pub);
             } catch {
               // We do not care
             }
