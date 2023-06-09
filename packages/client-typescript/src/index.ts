@@ -40,7 +40,46 @@ export class JerryClient {
       reconnectTimeout: 5,
     }, opts);
 
+    // Build the keypair we'll use
+    // TODO: allow fixed seed, for auth-uses like username+password => pbkdf2 => seed
     this.keypair = KeyPair.create(createSeed());
+
+    (async () => {
+      const response = await fetch(this.endpoint);
+      const reader   = response?.body?.getReader();
+
+      // TODO: retry
+      if (!reader) throw new Error("Invalid response");
+      let buffer = Buffer.alloc(0);
+
+      while(true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        // Append to the list
+        buffer  = Buffer.concat([ buffer, Buffer.from(value) ]);
+        let idx = buffer.indexOf("\n");
+        while(idx >= 0) {
+          const chunk = buffer.subarray(0, idx + 1);
+          buffer      = buffer.subarray(idx + 1);
+          idx         = buffer.indexOf("\n");
+
+          const data = JSON.parse(chunk.toString());
+          if (!('bdy' in data)) continue;
+
+          // TODO: catch json parse error
+          // TODO: verify signature
+
+          for(const listener of this.listeners) {
+            try {
+              listener(data.bdy);
+            } catch {
+              // We do not care
+            }
+          }
+        }
+      }
+    })();
 
     // TODO: long get stream
   }
