@@ -1,3 +1,5 @@
+import { createSeed, KeyPair } from 'supercop';
+
 export type JerryListener = (body: JerryEventBody) => void;
 
 export type JerryEventBody = null | string | number | { [index:string]: JerryEventBody };
@@ -27,6 +29,7 @@ export class JerryClient {
   protected opts     : JerryOptions;
   protected listeners: JerryListener[] = [];
   protected sequence : number = Math.floor(Math.random() * 2**16);
+  protected keypair  : Promise<KeyPair>;
 
   constructor(
     protected endpoint: string,
@@ -36,6 +39,8 @@ export class JerryClient {
       // Default settings
       reconnectTimeout: 5,
     }, opts);
+
+    this.keypair = KeyPair.create(createSeed());
 
     // TODO: long get stream
   }
@@ -50,14 +55,23 @@ export class JerryClient {
   }
 
   async emit(body: JerryEventBody): Promise<void> {
+
+    const data = {
+      pub: (await this.keypair).publicKey?.toString('hex'),
+      bdy: body,
+      seq: this.sequence++,
+    };
+
+    const signature = await (await this.keypair).sign(JSON.stringify(data));
+
     const response = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        bdy: body,
-        seq: this.sequence++,
+        ...data,
+        sig: signature.toString('hex'),
       })
     });
   }

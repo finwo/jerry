@@ -22,8 +22,8 @@
     "build": "npm run clean && npm run build:esm && npm run build:cjs",
     "build:cjs": "tsc -p ./config/tsconfig.cjs.json",
     "build:esm": "tsc -p ./config/tsconfig.esm.json && mv dist/esm/index.js dist/esm/index.mjs && mv dist/esm/index.js.map dist/esm/index.mjs.map",
-    "build:test": "esbuild --bundle test/app.ts > test/app.js",
-    "watch:test": "nodemon --watch test --ext ts --exec npm -- run build:test",
+    "build:test": "node test/build.js",
+    "watch:test": "nodemon --watch test --watch src --ext ts --exec npm -- run build:test",
     "linter": "eslint src",
     "postpublishOnly": "PACKAGE_VERSION=$(jq -r .version < package.json) && PACKAGE_NAME=$(jq -r .name < package.json) && npm deprecate \"${PACKAGE_NAME}@<${PACKAGE_VERSION}\" \"Rolling release, please update to ${PACKAGE_VERSION}\"",
     "watch": "nodemon --watch src --watch test --ext ts --exec npm -- run build"
@@ -31,7 +31,11 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@types/node": "^20.2.5",
     "esbuild": "^0.17.19"
+  },
+  "dependencies": {
+    "supercop": "^3.0.1"
   }
 }

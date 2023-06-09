@@ -3,7 +3,7 @@ BIN:=jerry
 
 default: build/$(TARGET)/$(BIN)
 
-build/$(TARGET)/Makefile: arch/$(TARGET) build/$(TARGET)/src build/$(TARGET)/lib
+build/$(TARGET)/Makefile: package.ini arch/$(TARGET) build/$(TARGET)/src build/$(TARGET)/lib
 	mkdir -p build/$(TARGET)
 	cd arch && tar -c $(TARGET) | tar -x -C ../build/$(TARGET)/ --strip-components=1
 
