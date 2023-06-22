@@ -214,8 +214,18 @@ export class JerryClient {
 
     }
 
-    // We're done sending
+    // We're done sending, resolve pending promises
     this.active = false;
+    while(this.queueListeners.length) {
+      const listener = this.queueListeners.shift();
+      if (!listener) continue;
+      try {
+        listener();
+      } catch {
+        // Don't care for now
+      }
+    }
+
   }
 
 }
