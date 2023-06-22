@@ -47,51 +47,61 @@ export class JerryClient {
     }, opts);
 
     // Build the keypair we'll use
-    // TODO: allow fixed seed, for auth-uses like username+password => pbkdf2 => seed
     if (opts.publicKey && opts.secretKey) {
       this.keypair = Promise.resolve(KeyPair.from(this.opts));
     } else {
       this.keypair = KeyPair.create(this.opts.seed);
     }
 
-    (async () => {
-      const response = await fetch(this.endpoint);
-      const reader   = response?.body?.getReader();
+    (async function retryer(_: JerryClient, delayIdx: number, delays: number[]) {
+      try {
+        const response = await fetch(_.endpoint);
+        const reader   = response?.body?.getReader();
 
-      // TODO: retry
-      if (!reader) throw new Error('Invalid response');
-      let buffer = Buffer.alloc(0);
+        // Validate connection opening
+        if (!reader) throw new Error('Invalid response');
+        let buffer = Buffer.alloc(0);
+        delayIdx   = 0;
 
-      for(;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
+        for(;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
 
-        // Append to the list
-        buffer  = Buffer.concat([ buffer, Buffer.from(value) ]);
-        let idx = buffer.indexOf('\n');
-        while(idx >= 0) {
-          const chunk = buffer.subarray(0, idx + 1);
-          buffer      = buffer.subarray(idx + 1);
-          idx         = buffer.indexOf('\n');
+          // Append to the list
+          buffer = Buffer.concat([ buffer, Buffer.from(value) ]);
 
-          const data = JSON.parse(chunk.toString());
-          if (!('bdy' in data)) continue;
+          // Read lines while there's line to be read
+          let idx = buffer.indexOf('\n');
+          while(idx >= 0) {
+            const chunk = buffer.subarray(0, idx + 1);
+            buffer      = buffer.subarray(idx + 1);
+            idx         = buffer.indexOf('\n');
 
-          // TODO: catch json parse error
-          // TODO: verify signature
+            const data = JSON.parse(chunk.toString());
+            if (!('bdy' in data)) continue;
 
-          for(const listener of this.listeners) {
-            try {
-              listener(data.bdy, data.pub);
-            } catch {
-              // We do not care
+            // TODO: catch json parse error
+            // TODO: verify signature
+
+            for(const listener of _.listeners) {
+              try {
+                listener(data.bdy, data.pub);
+              } catch {
+                // We do not care
+              }
             }
           }
         }
-      }
-    })();
 
-    // TODO: long get stream
+        // Nicely closed
+        setTimeout(() => retryer(_, 0, delays), delays[delayIdx]);
+      } catch {
+        // Died
+        const newIdx = Math.min(delayIdx + 1, delays.length - 1);
+        console.log(newIdx);
+        setTimeout(() => retryer(_, newIdx, delays), delays[delayIdx]);
+      }
+    })(this, 0, [1000, 2000, 5000, 10000, 15000]); // 1, 2, 5, 10, 15 seconds
   }
 
   addListener(fn: JerryListener) {
