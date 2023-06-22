@@ -40,6 +40,10 @@ export type JerryOptions = {
 };
 
 export class JerryClient {
+  protected active                                     = false;
+  protected queue         : JerryEventBody[]           = [];
+  protected queueListeners: (()=>void)[]               = [];
+
   protected opts          : JerryOptions;
   protected listeners     : JerryListener[]            = [];
   protected sequence      : number                     = Math.floor(Math.random() * seqLimit);
@@ -169,28 +173,49 @@ export class JerryClient {
   }
 
   async emit(body: JerryEventBody): Promise<void> {
-    const seq = this.sequence = mod(this.sequence + 1, seqLimit);
+    this.queue.push(body);
 
-    const data = {
-      pub: (await this.keypair).publicKey?.toString('hex'),
-      bdy: body,
-      seq,
-    };
+    // Add this message to the sending queue
+    if (this.active) {
+      return new Promise<void>(resolve => {
+        this.queueListeners.push(() => resolve());
+      });
+    }
 
-    const signature = await (await this.keypair).sign(JSON.stringify(data));
+    // Mark the sender as active, preventing parallel requests
+    this.active = true;
 
-    console.log(signature, data);
+    while(this.queue.length) {
+      const seq = this.sequence = mod(this.sequence + 1, seqLimit);
+      const bdy = this.queue.shift();
 
-    await fetch(this.endpoint, {
-      method : 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...data,
-        sig: signature.toString('hex'),
-      }),
-    });
+      const data = {
+        pub: (await this.keypair).publicKey?.toString('hex'),
+        bdy,
+        seq,
+      };
+
+      const signature = await (await this.keypair).sign(JSON.stringify(data));
+
+      try {
+        await fetch(this.endpoint, {
+          method : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...data,
+            sig: signature.toString('hex'),
+          }),
+        });
+      } catch {
+        // Don't care for now
+      }
+
+    }
+
+    // We're done sending
+    this.active = false;
   }
 
 }
