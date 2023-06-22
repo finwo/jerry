@@ -79,9 +79,29 @@ export class JerryClient {
 
             try {
               const data = JSON.parse(chunk.toString());
+              if (!('pub' in data)) continue;
               if (!('bdy' in data)) continue;
+              if (!('seq' in data)) continue;
+              if (!('sig' in data)) continue;
 
-              // TODO: verify signature
+              // Build body the signature is supposedly build with
+              const signatureBody = { ...data };
+              delete signatureBody.sig;
+
+              // Build usable public key from the given hex string
+              const remoteKeypair  = KeyPair.from({ publicKey: Buffer.from(data.pub, 'hex') });
+
+              // Validate the signature given
+              const signatureIsValid = await remoteKeypair.verify(
+                Buffer.from(data.sig, 'hex'),
+                JSON.stringify(signatureBody),
+              );
+              if (!signatureIsValid) {
+                // Discard message
+                continue;
+              }
+
+              // TODO: track seq for sender
 
               for(const listener of _.listeners) {
                 try {
@@ -91,7 +111,7 @@ export class JerryClient {
                 }
               }
             } catch {
-              // Invalid json
+              // Invalid json or invalid pubkey
             }
           }
         }
@@ -101,7 +121,6 @@ export class JerryClient {
       } catch {
         // Died
         const newIdx = Math.min(delayIdx + 1, delays.length - 1);
-        console.log(newIdx);
         setTimeout(() => retryer(_, newIdx, delays), delays[delayIdx]);
       }
     })(this, 0, [1000, 2000, 5000, 10000, 15000]); // 1, 2, 5, 10, 15 seconds
@@ -117,11 +136,12 @@ export class JerryClient {
   }
 
   async emit(body: JerryEventBody): Promise<void> {
+    this.sequence = (this.sequence + 1) % (2**16);
 
     const data = {
       pub: (await this.keypair).publicKey?.toString('hex'),
       bdy: body,
-      seq: this.sequence++,
+      seq: this.sequence,
     };
 
     const signature = await (await this.keypair).sign(JSON.stringify(data));
