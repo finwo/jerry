@@ -5,4 +5,7 @@ client.addListener((bdy: JerryEventBody, pub?: string) => {
   console.log({ bdy, pub });
 });
 
-client.emit('pizza');
+setTimeout(() => {
+  client.emit('pizza');
+  client.emit(Math.random().toString(36).slice(2));
+}, 500);

@@ -21,6 +21,17 @@ export type JerryEvent = {
   body     : JerryEventBody;
 };
 
+const seqLimit      = 2 ** 16;
+const knownSeqLimit = 3;
+const mod           = (n: number, m: number) => ((n%m)+m)%m;
+
+// Emulates converting unsigned integers to signed
+const sint = (n: number, m: number) => {
+  const t = mod(n,m);
+  if (t >= (m/2)) return n - m;
+  return n;
+};
+
 export type JerryOptions = {
   reconnectTimeout: number;
   seed            : Seed;
@@ -29,10 +40,11 @@ export type JerryOptions = {
 };
 
 export class JerryClient {
-  protected opts     : JerryOptions;
-  protected listeners: JerryListener[] = [];
-  protected sequence : number = Math.floor(Math.random() * 2**16);
-  protected keypair  : Promise<KeyPair>;
+  protected opts          : JerryOptions;
+  protected listeners     : JerryListener[]            = [];
+  protected sequence      : number                     = Math.floor(Math.random() * seqLimit);
+  protected keypair       : Promise<KeyPair>;
+  protected knownSequences: { [index:string]: number } = {};
 
   constructor(
     protected endpoint: string,
@@ -84,6 +96,19 @@ export class JerryClient {
               if (!('seq' in data)) continue;
               if (!('sig' in data)) continue;
 
+              // TODO: Allow single retry of out-of-order delivery
+              // Something like re-add it to the queue with a certain marker?
+
+              // Sequence-based deduplication
+              if (
+                (data.pub in _.knownSequences) &&
+                (sint(data.seq - _.knownSequences[data.pub], seqLimit) <= 0)
+              ) {
+                // Negative or repeating sequence, discard message
+                console.log('Discard, invalid seq');
+                continue;
+              }
+
               // Build body the signature is supposedly build with
               const signatureBody = { ...data };
               delete signatureBody.sig;
@@ -101,7 +126,15 @@ export class JerryClient {
                 continue;
               }
 
-              // TODO: track seq for sender
+              // Store the known sequence, because we verified the message originated from the pubkey
+              _.knownSequences[data.pub] = data.seq;
+
+              // Limit knownSequences size, else it'll grow quite big on busy busses
+              const sequenceKeys = Object.keys(_.knownSequences);
+              if (sequenceKeys.length > knownSeqLimit) {
+                const deleteIdx = Math.floor(Math.random() * sequenceKeys.length);
+                delete _.knownSequences[sequenceKeys[deleteIdx]];
+              }
 
               for(const listener of _.listeners) {
                 try {
@@ -136,15 +169,17 @@ export class JerryClient {
   }
 
   async emit(body: JerryEventBody): Promise<void> {
-    this.sequence = (this.sequence + 1) % (2**16);
+    const seq = this.sequence = mod(this.sequence + 1, seqLimit);
 
     const data = {
       pub: (await this.keypair).publicKey?.toString('hex'),
       bdy: body,
-      seq: this.sequence,
+      seq,
     };
 
     const signature = await (await this.keypair).sign(JSON.stringify(data));
+
+    console.log(signature, data);
 
     await fetch(this.endpoint, {
       method : 'POST',
