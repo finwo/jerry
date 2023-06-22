@@ -1,6 +1,6 @@
-import { createSeed, KeyPair } from 'supercop';
+import { createSeed, KeyPair, PublicKey, SecretKey, Seed } from 'supercop';
 
-export type JerryListener = (body: JerryEventBody, pubkey?: string) => void;
+export type JerryListener = (body: JerryEventBody, pubkey: string) => void;
 
 export type JerryEventBody = null | string | number | { [index:string]: JerryEventBody };
 
@@ -23,6 +23,9 @@ export type JerryEvent = {
 
 export type JerryOptions = {
   reconnectTimeout: number;
+  seed            : Seed;
+  publicKey       : PublicKey;
+  secretKey       : SecretKey;
 };
 
 export class JerryClient {
@@ -33,36 +36,43 @@ export class JerryClient {
 
   constructor(
     protected endpoint: string,
-    opts: Partial<JerryOptions> = {}
+    opts: Partial<JerryOptions> = {},
   ) {
     this.opts = Object.assign({
       // Default settings
       reconnectTimeout: 5,
+      seed            : createSeed(),
+      publicKey       : null,
+      secretKey       : null,
     }, opts);
 
     // Build the keypair we'll use
     // TODO: allow fixed seed, for auth-uses like username+password => pbkdf2 => seed
-    this.keypair = KeyPair.create(createSeed());
+    if (opts.publicKey && opts.secretKey) {
+      this.keypair = Promise.resolve(KeyPair.from(this.opts));
+    } else {
+      this.keypair = KeyPair.create(this.opts.seed);
+    }
 
     (async () => {
       const response = await fetch(this.endpoint);
       const reader   = response?.body?.getReader();
 
       // TODO: retry
-      if (!reader) throw new Error("Invalid response");
+      if (!reader) throw new Error('Invalid response');
       let buffer = Buffer.alloc(0);
 
-      while(true) {
+      for(;;) {
         const { value, done } = await reader.read();
         if (done) break;
 
         // Append to the list
         buffer  = Buffer.concat([ buffer, Buffer.from(value) ]);
-        let idx = buffer.indexOf("\n");
+        let idx = buffer.indexOf('\n');
         while(idx >= 0) {
           const chunk = buffer.subarray(0, idx + 1);
           buffer      = buffer.subarray(idx + 1);
-          idx         = buffer.indexOf("\n");
+          idx         = buffer.indexOf('\n');
 
           const data = JSON.parse(chunk.toString());
           if (!('bdy' in data)) continue;
@@ -103,15 +113,15 @@ export class JerryClient {
 
     const signature = await (await this.keypair).sign(JSON.stringify(data));
 
-    const response = await fetch(this.endpoint, {
-      method: 'POST',
+    await fetch(this.endpoint, {
+      method : 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         ...data,
         sig: signature.toString('hex'),
-      })
+      }),
     });
   }
 

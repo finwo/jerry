@@ -33,7 +33,9 @@
   "devDependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@types/node": "^20.2.5",
-    "esbuild": "^0.17.19"
+    "@typescript-eslint/eslint-plugin": "^5.60.0",
+    "esbuild": "^0.17.19",
+    "eslint": "^8.43.0"
   },
   "dependencies": {
     "supercop": "^3.0.1"
