@@ -77,18 +77,21 @@ export class JerryClient {
             buffer      = buffer.subarray(idx + 1);
             idx         = buffer.indexOf('\n');
 
-            const data = JSON.parse(chunk.toString());
-            if (!('bdy' in data)) continue;
+            try {
+              const data = JSON.parse(chunk.toString());
+              if (!('bdy' in data)) continue;
 
-            // TODO: catch json parse error
-            // TODO: verify signature
+              // TODO: verify signature
 
-            for(const listener of _.listeners) {
-              try {
-                listener(data.bdy, data.pub);
-              } catch {
-                // We do not care
+              for(const listener of _.listeners) {
+                try {
+                  listener(data.bdy, data.pub);
+                } catch {
+                  // We do not care
+                }
               }
+            } catch {
+              // Invalid json
             }
           }
         }
