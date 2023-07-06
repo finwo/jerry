@@ -74,8 +74,28 @@ void jerry_route_post(struct hs_udata *hsdata) {
   JSON_Value *jEvent = json_parse_string(request->body);
   if (json_value_get_type(jEvent) != JSONObject) {
     json_value_free(jEvent);
-    _jerry_respond_error(hsdata, 422, "Only JSON objects are allowed");
-    return;
+    return _jerry_respond_error(hsdata, 422, "Only JSON objects are allowed");
+  }
+
+  // Easy reference to the obj
+  JSON_Object * oEvent = json_value_get_object(jEvent);
+
+  // Check for required fields (and basic typing
+  if (!json_object_has_value_of_type(oEvent, "pub", JSONString)) {
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
+  }
+  if (!json_object_has_value_of_type(oEvent, "sig", JSONString)) {
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
+  }
+  if (!json_object_has_value_of_type(oEvent, "seq", JSONNumber)) {
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "'seq' field is required to contain a number representing the current sequence number");
+  }
+  if (!json_object_has_value(oEvent, "bdy")) {
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "Missing 'bdy' field");
   }
 
   // TODO: check if the required fields are set
