@@ -98,7 +98,19 @@ void jerry_route_post(struct hs_udata *hsdata) {
     return _jerry_respond_error(hsdata, 422, "Missing 'bdy' field");
   }
 
-  // TODO: check if the required fields are set
+  // Validate pubkey/signature structure
+  if (json_object_get_string_len(oEvent, "pub") != 64) { // 32 bytes, so 64 hex characters
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
+  }
+  if (json_object_get_string_len(oEvent, "sig") != 128) { // 64 bytes, so 128 hex characters
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
+  }
+
+  // TODO: pub+seq deduplication
+  // TODO: validate signature
+  // TODO: record pub+seq in lru
 
   // Here = valid json object, we need to propagate the event to all listeners
 
