@@ -17,6 +17,7 @@
     }
   },
   "scripts": {
+    "dev": "concurrently \"npm run watch:test\" \"browser-sync test\"",
     "test": "npm run linter && npm run build && node_modules/.bin/tap --reporter-arg=--reporter=html --branches=50 --functions=90 --lines=98 --statements=81 'dist/test/**/*.test.js'",
     "clean": "rm -rf ./dist",
     "build": "npm run clean && npm run build:esm && npm run build:cjs",
@@ -34,6 +35,8 @@
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@types/node": "^20.2.5",
     "@typescript-eslint/eslint-plugin": "^5.60.0",
+    "browser-sync": "^2.29.3",
+    "concurrently": "^8.2.0",
     "esbuild": "^0.17.19",
     "eslint": "^8.43.0"
   },
