@@ -195,7 +195,8 @@ export class JerryClient {
         seq,
       };
 
-      console.log('Msg', JSON.stringify(data));
+      const validationMessage = JSON.stringify(data);
+      console.log('Msg', validationMessage.length, validationMessage);
       const signature = await (await this.keypair).sign(JSON.stringify(data));
 
       try {

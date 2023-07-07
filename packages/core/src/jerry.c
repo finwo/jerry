@@ -156,7 +156,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
   json_object_remove(oEventValidate, "sig");
   char *strEventValidate      = json_serialize_to_string(jEventValidate);
 
-  printf("Msg: %s\n", strEventValidate);
+  printf("Msg: %d, %s\n", strlen(strEventValidate), strEventValidate);
 
   // Do the actual signature check
   int isValid = ed25519_verify(&eventSig, strEventValidate, strlen(strEventValidate), &eventPub);
