@@ -39,8 +39,8 @@ void dedup_purge(
   void *udata
 ) {
   const struct dedup_entry *tsubject = subject;
-  free(subject->pubkey);
-  free(subject);
+  free(tsubject->pubkey);
+  free(tsubject);
 }
 
 int isHex(const char *subject) {
