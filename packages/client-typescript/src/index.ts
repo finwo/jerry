@@ -95,6 +95,7 @@ export class JerryClient {
 
             try {
               const data = JSON.parse(chunk.toString());
+              console.log({ data });
               if (!('pub' in data)) continue;
               if (!('bdy' in data)) continue;
               if (!('seq' in data)) continue;

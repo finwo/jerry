@@ -141,33 +141,33 @@ void jerry_route_post(struct hs_udata *hsdata) {
 
   // TODO: pub+seq deduplication
 
-  // Convert pub and sig to buffers
-  char eventPub[32];
-  char eventSig[64];
-  int i;
-  for(i = 0 ; i < 64 ; i++) {
-    if (i < 32) sscanf(strPub + (i*2), "%2hhx", &eventPub[i]);
-                sscanf(strSig + (i*2), "%2hhx", &eventSig[i]);
-  }
+  /* // Convert pub and sig to buffers */
+  /* char eventPub[32]; */
+  /* char eventSig[64]; */
+  /* int i; */
+  /* for(i = 0 ; i < 64 ; i++) { */
+  /*   if (i < 32) sscanf(strPub + (i*2), "%2hhx", &eventPub[i]); */
+  /*               sscanf(strSig + (i*2), "%2hhx", &eventSig[i]); */
+  /* } */
 
-  // Rebuild the signed message
-  JSON_Value  *jEventValidate = json_value_deep_copy(jEvent);
-  JSON_Object *oEventValidate = json_value_get_object(jEventValidate);
-  json_object_remove(oEventValidate, "sig");
-  char *strEventValidate      = json_serialize_to_string(jEventValidate);
+  /* // Rebuild the signed message */
+  /* JSON_Value  *jEventValidate = json_value_deep_copy(jEvent); */
+  /* JSON_Object *oEventValidate = json_value_get_object(jEventValidate); */
+  /* json_object_remove(oEventValidate, "sig"); */
+  /* char *strEventValidate      = json_serialize_to_string(jEventValidate); */
 
-  // Do the actual signature check
-  int isValid = ed25519_verify(eventSig, strEventValidate, strlen(strEventValidate), eventPub);
+  /* // Do the actual signature check */
+  /* int isValid = ed25519_verify(eventSig, strEventValidate, strlen(strEventValidate), eventPub); */
 
-  // Free used memory before checking the result
-  // We'll never use these values anymore
-  json_free_serialized_string(strEventValidate);
-  json_value_free(jEventValidate);
+  /* // Free used memory before checking the result */
+  /* // We'll never use these values anymore */
+  /* json_free_serialized_string(strEventValidate); */
+  /* json_value_free(jEventValidate); */
 
-  if (!isValid) {
-    json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "invalid signature");
-  }
+  /* if (!isValid) { */
+  /*   json_value_free(jEvent); */
+  /*   return _jerry_respond_error(hsdata, 422, "invalid signature"); */
+  /* } */
 
   // TODO: record pub+seq in lru
 
