@@ -16,6 +16,22 @@ struct llistener {
 
 struct llistener *listeners = NULL;
 
+int isHex(const char *subject) {
+  int i;
+  size_t l = strlen(subject);
+  for(i = 0 ; i < l ; i++) {
+    if (
+      (subject[i] >= 'a' && subject[i] <= 'f') ||
+      (subject[i] >= 'A' && subject[i] <= 'F') ||
+      (subject[i] >= '0' && subject[i] <= '9')
+    ) {
+      continue;
+    }
+    return 0;
+  }
+  return 1;
+}
+
 void _jerry_respond_error(
   struct hs_udata *hsdata,
   int status,
@@ -107,6 +123,26 @@ void jerry_route_post(struct hs_udata *hsdata) {
     json_value_free(jEvent);
     return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
   }
+
+  printf(
+    "pub: %s\nsig: %s\n",
+    json_object_get_string(oEvent, "pub"),
+    json_object_get_string(oEvent, "sig")
+  );
+
+  // Check if both strings are actualy hex
+  if (!isHex(json_object_get_string(oEvent, "pub"))) {
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
+  }
+  if (!isHex(json_object_get_string(oEvent, "sig"))) {
+    json_value_free(jEvent);
+    return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
+  }
+
+
+
+
 
   // TODO: pub+seq deduplication
   // TODO: validate signature
