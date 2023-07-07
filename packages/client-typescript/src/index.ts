@@ -199,6 +199,9 @@ export class JerryClient {
       console.log('Msg', validationMessage.length, validationMessage);
       const signature = await (await this.keypair).sign(JSON.stringify(data));
 
+      const isValid = await (await this.keypair).verify(signature,validationMessage);
+      console.log(isValid);
+
       try {
         await fetch(this.endpoint, {
           method : 'POST',

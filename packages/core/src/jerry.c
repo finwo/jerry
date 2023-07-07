@@ -142,8 +142,8 @@ void jerry_route_post(struct hs_udata *hsdata) {
   // TODO: pub+seq deduplication
 
   // Convert pub and sig to buffers
-  char *eventPub[32];
-  char *eventSig[64];
+  char eventPub[32];
+  char eventSig[64];
   int i;
   for(i = 0 ; i < 64 ; i++) {
     if (i < 32) sscanf(strPub + (i*2), "%2hhx", &eventPub[i]);
@@ -159,7 +159,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
   printf("Msg: %d, %s\n", strlen(strEventValidate), strEventValidate);
 
   // Do the actual signature check
-  int isValid = ed25519_verify(&eventSig, strEventValidate, strlen(strEventValidate), &eventPub);
+  int isValid = ed25519_verify(eventSig, strEventValidate, strlen(strEventValidate), eventPub);
 
   // Free used memory before checking the result
   // We'll never use these values anymore
