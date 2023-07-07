@@ -174,8 +174,8 @@ void jerry_route_post(struct hs_udata *hsdata) {
   uint16_t seq_stored;
   uint16_t seq_gotten = (uint16_t)json_object_get_number(oEvent, "seq");
   int16_t seq_result;
-  if (dedup_entry) {
-    seq_stored = dedup_entry->seq;
+  if (dd_entry) {
+    seq_stored = dd_entry->seq;
     seq_result = (int16_t)(seq_gotten - seq_stored);
     if (seq_result <= 0) {
       json_value_free(jEvent);
