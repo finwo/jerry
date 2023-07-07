@@ -4,6 +4,7 @@
 
 #include "finwo/http-server.h"
 #include "finwo/http-parser.h"
+#include "finwo/mindex.h"
 #include "kgabis/parson.h"
 #include "orlp/ed25519.h"
 #include "tidwall/evio.h"
@@ -15,7 +16,29 @@ struct llistener {
   struct evio_conn *conn;
 };
 
+struct dedup_entry {
+  char *pubkey;
+  int seq;
+};
+
 struct llistener *listeners = NULL;
+struct mindex_t * dedup_index = NULL;
+
+int dedup_compare(
+    const struct dedup_entry *a,
+    const struct dedup_entry *b,
+    void *udata
+) {
+  return strcmp(a->pubkey, b->pubkey);
+}
+
+void dedup_purge(
+  const struct dedup_entry *subject,
+  void *udata
+) {
+  free(subject->pubkey);
+  free(subject);
+}
 
 int isHex(const char *subject) {
   int i;
@@ -139,7 +162,12 @@ void jerry_route_post(struct hs_udata *hsdata) {
     return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
   }
 
-  // TODO: pub+seq deduplication
+  // Fetch the dedup entry for the given pubkey
+  struct dedup_entry dd_pattern = { .pubkey = strdup(strPub) };
+  struct dedup_entry *dd_entry = mindex_get(dedup_index, *dd_pattern);
+  free(dd_pattern.pubkey);
+
+  // TODO: if dd_entry, check if incrementing uint16
 
   // Convert pub and sig to buffers
   char eventPub[32];
@@ -169,9 +197,29 @@ void jerry_route_post(struct hs_udata *hsdata) {
     return _jerry_respond_error(hsdata, 422, "invalid signature");
   }
 
-  // TODO: record pub+seq in lru
-
   // Here = valid json object, we need to propagate the event to all listeners
+
+  // Create new dd_entry if missing
+  if (!dd_entry) {
+    dd_entry = malloc(sizeof(dd_entry));
+    dd_entry->pubkey = strdup(strPub);
+    // seq is set later, no need here
+    mindex_set(dedup_index, dd_entry);
+  }
+
+  // Update the mindex entry
+  dd_entry->seq = (int)json_object_get_number(oEvent, "seq");
+
+  // Limit the length of the mindex
+  // TODO: configurable length
+  printf("Mindex length: %d\n", mindex_length(dedup_index));
+
+  if (mindex_length(dedup_index) > 4) {
+    dd_entry = mindex_rand(dedup_index);
+    mindex_delete(dd_entry);
+  }
+
+  // Caution: dd_entry is unsafe here
 
   // Pre-render json into chunk to distribute
   chunk_json = json_serialize_to_string(jEvent);
@@ -264,6 +312,8 @@ void jerry_onClose(struct hs_udata *hsdata, void *udata) {
 }
 
 void jerry_register(char *path) {
+  dedup_index = mindex_init(dedup_compare, dedup_purge, NULL);
+
   http_server_route("GET"    , path, jerry_route_get);
   http_server_route("POST"   , path, jerry_route_post);
   http_server_route("OPTIONS", path, jerry_route_options);
