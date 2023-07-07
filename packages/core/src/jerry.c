@@ -153,7 +153,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
   // Rebuild the signed message
   JSON_Value  *jEventValidate = json_value_deep_copy(jEvent);
   JSON_Object *oEventValidate = json_value_get_object(jEventValidate);
-  json_object_remove(oEventvalidate, "sig");
+  json_object_remove(oEventValidate, "sig");
   char *strEventValidate      = json_serialize_to_string(jEventValidate);
 
   // Do the actual signature check
