@@ -215,8 +215,6 @@ void jerry_route_post(struct hs_udata *hsdata) {
 
   // Limit the length of the mindex
   // TODO: configurable length
-  printf("Mindex length: %d\n", mindex_length(dedup_index));
-
   if (mindex_length(dedup_index) > 4) {
     dd_entry = mindex_rand(dedup_index);
     mindex_delete(dedup_index, dd_entry);
