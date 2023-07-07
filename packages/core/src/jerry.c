@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,7 +19,7 @@ struct llistener {
 
 struct dedup_entry {
   char *pubkey;
-  int seq;
+  uint16_t seq;
 };
 
 struct llistener *listeners = NULL;
@@ -170,7 +171,17 @@ void jerry_route_post(struct hs_udata *hsdata) {
   struct dedup_entry *dd_entry = mindex_get(dedup_index, &dd_pattern);
   free(dd_pattern.pubkey);
 
-  // TODO: if dd_entry, check if incrementing uint16
+  uint16_t seq_stored;
+  uint16_t seq_gotten = (uint16_t)json_object_get_number(oEvent, "seq");
+  int16_t seq_result;
+  if (dedup_entry) {
+    seq_stored = dedup_entry->seq;
+    seq_result = (int16_t)(seq_gotten - seq_stored);
+    if (seq_result <= 0) {
+      json_value_free(jEvent);
+      return _jerry_respond_error(hsdata, 422, "invalid seq");
+    }
+  }
 
   // Convert pub and sig to buffers
   char eventPub[32];
@@ -211,7 +222,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
   }
 
   // Update the mindex entry
-  dd_entry->seq = (int)json_object_get_number(oEvent, "seq");
+  dd_entry->seq = seq_gotten;
 
   // Limit the length of the mindex
   // TODO: configurable length
