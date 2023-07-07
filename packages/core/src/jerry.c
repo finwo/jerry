@@ -25,17 +25,20 @@ struct llistener *listeners = NULL;
 struct mindex_t * dedup_index = NULL;
 
 int dedup_compare(
-    const struct dedup_entry *a,
-    const struct dedup_entry *b,
+    const void *a,
+    const void *b,
     void *udata
 ) {
-  return strcmp(a->pubkey, b->pubkey);
+  const struct dedup_entry *ta = a;
+  const struct dedup_entry *tb = b;
+  return strcmp(ta->pubkey, tb->pubkey);
 }
 
 void dedup_purge(
-  const struct dedup_entry *subject,
+  const void *subject,
   void *udata
 ) {
+  const struct dedup_entry *tsubject = subject;
   free(subject->pubkey);
   free(subject);
 }
@@ -164,7 +167,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
 
   // Fetch the dedup entry for the given pubkey
   struct dedup_entry dd_pattern = { .pubkey = strdup(strPub) };
-  struct dedup_entry *dd_entry = mindex_get(dedup_index, *dd_pattern);
+  struct dedup_entry *dd_entry = mindex_get(dedup_index, &dd_pattern);
   free(dd_pattern.pubkey);
 
   // TODO: if dd_entry, check if incrementing uint16
@@ -216,7 +219,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
 
   if (mindex_length(dedup_index) > 4) {
     dd_entry = mindex_rand(dedup_index);
-    mindex_delete(dd_entry);
+    mindex_delete(dedup_index, dd_entry);
   }
 
   // Caution: dd_entry is unsafe here
