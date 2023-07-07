@@ -124,24 +124,28 @@ void jerry_route_post(struct hs_udata *hsdata) {
     return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
   }
 
-  printf(
-    "pub: %s\nsig: %s\n",
-    json_object_get_string(oEvent, "pub"),
-    json_object_get_string(oEvent, "sig")
-  );
+  // Easier reference that doesn't require more fn calls
+  char *strPub = json_object_get_string(oEvent, "pub");
+  char *strSig = json_object_get_string(oEvent, "sig");
 
   // Check if both strings are actualy hex
-  if (!isHex(json_object_get_string(oEvent, "pub"))) {
+  if (!isHex(strPub)) {
     json_value_free(jEvent);
     return _jerry_respond_error(hsdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
   }
-  if (!isHex(json_object_get_string(oEvent, "sig"))) {
+  if (!isHex(strSig)) {
     json_value_free(jEvent);
     return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
   }
 
-
-
+  // Convert pub and sig to buffers
+  char *eventPub[32];
+  char *eventSig[64];
+  int i;
+  for(i = 0 ; i < 64 ; i++) {
+    if (i < 32) sscanf(strPub + (i*2), "%2hhx", &eventPub[i]);
+                sscanf(strSig + (i*2), "%2hhx", &eventSig[i]);
+  }
 
 
   // TODO: pub+seq deduplication
