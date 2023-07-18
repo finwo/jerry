@@ -23,4 +23,4 @@ default: $(BIN)
 $(OBJ): $(SRC)
 
 $(BIN): $(OBJ)
-	$(CPP) $(LDFLAGS) $(OBJ) -o $@
+	$(CC) $(LDFLAGS) $(OBJ) -o $@

@@ -58,7 +58,6 @@ int main(int argc, char *argv[]) {
     .notFound = route_404
   };
 
-
   jerry_register("/api/v1/jerry");
   http_server_route("GET", "/hello", route_get_hello);
   http_server_main(addrs, sizeof(addrs) / sizeof(void*), &evs, NULL);
