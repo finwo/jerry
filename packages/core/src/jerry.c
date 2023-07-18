@@ -323,10 +323,28 @@ void jerry_onClose(struct hs_udata *hsdata, void *udata) {
   }
 }
 
-void jerry_register(char *path) {
+void jerry_register(const char *path) {
   dedup_index = mindex_init(dedup_compare, dedup_purge, NULL);
 
   http_server_route("GET"    , path, jerry_route_get);
   http_server_route("POST"   , path, jerry_route_post);
   http_server_route("OPTIONS", path, jerry_route_options);
+}
+
+void jerry_join(const char *url) {
+  char *target = url;
+  const char *mode;
+
+  if (strstr(target, "http://") == target) {
+    target += 7;
+    mode    = "http";
+  /* } else if (strstr(target, "tcp://") == target) { */
+  /*   target += 6;*/ 
+  /*   mode    = "tcp"; */
+  } else {
+    fprintf(stderr, "Unsupported target url: %s\n", target);
+    exit(1);
+  }
+
+  fprintf(stderr, "Join feature not implemented yet\n");
 }
