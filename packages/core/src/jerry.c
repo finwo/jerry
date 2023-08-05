@@ -8,13 +8,14 @@
 #include "finwo/mindex.h"
 #include "kgabis/parson.h"
 #include "orlp/ed25519.h"
-#include "tidwall/evio.h"
+#include "finwo/fnet.h"
+#include "tidwall/buf.h"
 
 #include "jerry.h"
 
 struct llistener {
   void *next;
-  struct evio_conn *conn;
+  struct fnet_t *conn;
 };
 
 struct dedup_entry {
@@ -36,10 +37,10 @@ int dedup_compare(
 }
 
 void dedup_purge(
-  const void *subject,
+  void *subject,
   void *udata
 ) {
-  const struct dedup_entry *tsubject = subject;
+  struct dedup_entry *tsubject = subject;
   free(tsubject->pubkey);
   free(tsubject);
 }
@@ -61,27 +62,32 @@ int isHex(const char *subject) {
 }
 
 void _jerry_respond_error(
-  struct hs_udata *hsdata,
+  struct http_server_reqdata *reqdata,
   int status,
   const char *message
 ) {
-  struct http_parser_message *response = hsdata->reqres->response;
+  struct http_parser_message *response = reqdata->reqres->response;
   response->status = status;
   http_parser_header_set(response, "Content-Type", "application/json");
-  asprintf(&(response->body), "{\"ok\":false,\"message\":\"%s\"}", message);
-  response->bodysize = strlen(response->body);
-  char *buffer = http_parser_sprint_response(response);
-  evio_conn_write(hsdata->connection, buffer, strlen(buffer));
+
+  response->body = calloc(1, sizeof(struct buf));
+  asprintf(&(response->body->data), "{\"ok\":false,\"message\":\"%s\"}", message);
+  response->body->len = strlen(response->body->data);
+  response->body->cap = response->body->len + 1;
+
+  struct buf *buffer = http_parser_sprint_response(response);
+  fnet_write(reqdata->connection, buffer);
+  buf_clear(buffer);
   free(buffer);
-  evio_conn_close(hsdata->connection);
+
+  fnet_close(reqdata->connection);
 }
 
-void jerry_route_options(struct hs_udata *hsdata) {
-  struct evio_conn *conn = hsdata->connection;
+void jerry_route_options(struct http_server_reqdata *reqdata) {
 
   // Create easy references
-  struct http_parser_message *request  = hsdata->reqres->request;
-  struct http_parser_message *response = hsdata->reqres->response;
+  struct http_parser_message *request  = reqdata->reqres->request;
+  struct http_parser_message *response = reqdata->reqres->response;
 
   const char *origin = http_parser_header_get(request, "Origin");
 
@@ -92,33 +98,31 @@ void jerry_route_options(struct hs_udata *hsdata) {
   http_parser_header_set(response, "Connection"                  , "close");
 
   // Send response
-  char *response_buffer = http_parser_sprint_response(response);
-  evio_conn_write(hsdata->connection, response_buffer, strlen(response_buffer));
+  struct buf *response_buffer = http_parser_sprint_response(response);
+  fnet_write(reqdata->connection, response_buffer);
+  buf_clear(response_buffer);
   free(response_buffer);
 
   // Aanndd.. we're done
-  evio_conn_close(hsdata->connection);
+  fnet_close(reqdata->connection);
 }
 
-void jerry_route_post(struct hs_udata *hsdata) {
-  struct evio_conn *conn = hsdata->connection;
-
+void jerry_route_post(struct http_server_reqdata *reqdata) {
   struct llistener *listener;
-  struct llistener *prev_listener = NULL;
-  char *response_buffer;
+  struct buf *response_buffer;
   char *chunk_json;
   char *chunk;
   int chunk_len;
 
   // Create easy references
-  struct http_parser_message *request  = hsdata->reqres->request;
-  struct http_parser_message *response = hsdata->reqres->response;
+  struct http_parser_message *request  = reqdata->reqres->request;
+  struct http_parser_message *response = reqdata->reqres->response;
 
   // Parse and validate the body
-  JSON_Value *jEvent = json_parse_string(request->body);
+  JSON_Value *jEvent = json_parse_string(request->body->data);
   if (json_value_get_type(jEvent) != JSONObject) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "Only JSON objects are allowed");
+    return _jerry_respond_error(reqdata, 422, "Only JSON objects are allowed");
   }
 
   // Easy reference to the obj
@@ -127,43 +131,43 @@ void jerry_route_post(struct hs_udata *hsdata) {
   // Check for required fields (and basic typing
   if (!json_object_has_value_of_type(oEvent, "pub", JSONString)) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
+    return _jerry_respond_error(reqdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
   }
   if (!json_object_has_value_of_type(oEvent, "sig", JSONString)) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
+    return _jerry_respond_error(reqdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
   }
   if (!json_object_has_value_of_type(oEvent, "seq", JSONNumber)) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "'seq' field is required to contain a number representing the current sequence number");
+    return _jerry_respond_error(reqdata, 422, "'seq' field is required to contain a number representing the current sequence number");
   }
   if (!json_object_has_value(oEvent, "bdy")) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "Missing 'bdy' field");
+    return _jerry_respond_error(reqdata, 422, "Missing 'bdy' field");
   }
 
   // Validate pubkey/signature structure
   if (json_object_get_string_len(oEvent, "pub") != 64) { // 32 bytes, so 64 hex characters
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
+    return _jerry_respond_error(reqdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
   }
   if (json_object_get_string_len(oEvent, "sig") != 128) { // 64 bytes, so 128 hex characters
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
+    return _jerry_respond_error(reqdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
   }
 
   // Easier reference that doesn't require more fn calls
-  char *strPub = json_object_get_string(oEvent, "pub");
-  char *strSig = json_object_get_string(oEvent, "sig");
+  const char *strPub = json_object_get_string(oEvent, "pub");
+  const char *strSig = json_object_get_string(oEvent, "sig");
 
   // Check if both strings are actualy hex
   if (!isHex(strPub)) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
+    return _jerry_respond_error(reqdata, 422, "'pub' field must be a hexidecimal string containing the origin public key");
   }
   if (!isHex(strSig)) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
+    return _jerry_respond_error(reqdata, 422, "'sig' field must be a hexidecimal string representing a ed25519 signature");
   }
 
   // Fetch the dedup entry for the given pubkey
@@ -179,7 +183,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
     seq_result = (int16_t)(seq_gotten - seq_stored);
     if (seq_result <= 0) {
       json_value_free(jEvent);
-      return _jerry_respond_error(hsdata, 422, "invalid seq");
+      return _jerry_respond_error(reqdata, 422, "invalid seq");
     }
   }
 
@@ -188,8 +192,10 @@ void jerry_route_post(struct hs_udata *hsdata) {
   char eventSig[64];
   int i;
   for(i = 0 ; i < 64 ; i++) {
-    if (i < 32) sscanf(strPub + (i*2), "%2hhx", &eventPub[i]);
-                sscanf(strSig + (i*2), "%2hhx", &eventSig[i]);
+    if (i < 32) {
+      sscanf(strPub + (i*2), "%2hhx", &eventPub[i]);
+    }
+    sscanf(strSig + (i*2), "%2hhx", &eventSig[i]);
   }
 
   // Rebuild the signed message
@@ -199,7 +205,7 @@ void jerry_route_post(struct hs_udata *hsdata) {
   char *strEventValidate      = json_serialize_to_string(jEventValidate);
 
   // Do the actual signature check
-  int isValid = ed25519_verify(eventSig, strEventValidate, strlen(strEventValidate), eventPub);
+  int isValid = ed25519_verify((unsigned char *)eventSig, (unsigned char *)strEventValidate, strlen(strEventValidate), (unsigned char *) eventPub);
 
   // Free used memory before checking the result
   // We'll never use these values anymore
@@ -208,14 +214,14 @@ void jerry_route_post(struct hs_udata *hsdata) {
 
   if (!isValid) {
     json_value_free(jEvent);
-    return _jerry_respond_error(hsdata, 422, "invalid signature");
+    return _jerry_respond_error(reqdata, 422, "invalid signature");
   }
 
   // Here = valid json object, we need to propagate the event to all listeners
 
   // Create new dd_entry if missing
   if (!dd_entry) {
-    dd_entry = malloc(sizeof(dd_entry));
+    dd_entry = malloc(sizeof(struct dedup_entry));
     dd_entry->pubkey = strdup(strPub);
     // seq is set later, no need here
     mindex_set(dedup_index, dd_entry);
@@ -243,8 +249,11 @@ void jerry_route_post(struct hs_udata *hsdata) {
   // Dsitribute
   listener = listeners;
   while(listener) {
-    evio_conn_write(listener->conn, chunk, chunk_len);
-    prev_listener = listener;
+    fnet_write(listener->conn, &(struct buf){
+      .data = chunk,
+      .len  = chunk_len,
+      .cap  = chunk_len,
+    });
     listener      = listener->next;
   }
 
@@ -256,25 +265,29 @@ void jerry_route_post(struct hs_udata *hsdata) {
   response->status = 200;
   http_parser_header_set(response, "Content-Type"                , "application/json"   );
   http_parser_header_set(response, "Access-Control-Allow-Origin" , origin ? origin : "*");
-  response->body     = strdup("{\"ok\":true}");
-  response->bodysize = strlen(response->body);
+
+  response->body       = calloc(1, sizeof(struct buf));
+  response->body->data = strdup("{\"ok\":true}");
+  response->body->len  = strlen(response->body->data);
+  response->body->cap  = response->body->len + 1;
 
   // Send response
   response_buffer = http_parser_sprint_response(response);
-  evio_conn_write(hsdata->connection, response_buffer, strlen(response_buffer));
+  fnet_write(reqdata->connection, response_buffer);
+  buf_clear(response_buffer);
   free(response_buffer);
 
   // Aanndd.. we're done
-  evio_conn_close(hsdata->connection);
+  fnet_close(reqdata->connection);
 }
 
-void jerry_route_get(struct hs_udata *hsdata) {
-  struct evio_conn *conn  = hsdata->connection;
+void jerry_route_get(struct http_server_reqdata *reqdata) {
+  struct fnet_t *conn = reqdata->connection;
 
   // Fetching the request
   // Has been wrapped in http_parser_event to support more features in the future
-  struct http_parser_message *request  = hsdata->reqres->request;
-  struct http_parser_message *response = hsdata->reqres->response;
+  struct http_parser_message *request  = reqdata->reqres->request;
+  struct http_parser_message *response = reqdata->reqres->response;
 
   // Build response
   const char *origin = http_parser_header_get(request, "Origin");
@@ -283,14 +296,16 @@ void jerry_route_get(struct hs_udata *hsdata) {
   http_parser_header_set(response, "Content-Type"                , "application/x-ndjson");
   http_parser_header_set(response, "Access-Control-Allow-Origin" , origin ? origin : "*" );
 
-
   // Assign an empty body, we're not doing anything yet
-  response->body     = strdup("");
-  response->bodysize = 0;
+  response->body = calloc(1, sizeof(struct buf));
+  response->body->data = strdup("");
+  response->body->len  = 0;
+  response->body->cap  = 1;
 
   // Send response
-  char *response_buffer = http_parser_sprint_response(response);
-  evio_conn_write(conn, response_buffer, strlen(response_buffer));
+  struct buf *response_buffer = http_parser_sprint_response(response);
+  fnet_write(conn, response_buffer);
+  buf_clear(response_buffer);
   free(response_buffer);
 
   // Add the connection to listener list
@@ -302,8 +317,8 @@ void jerry_route_get(struct hs_udata *hsdata) {
   // Intentionally NOT closing the connection
 }
 
-void jerry_onClose(struct hs_udata *hsdata, void *udata) {
-  struct evio_conn *conn = hsdata->connection;
+void jerry_onClose(struct http_server_reqdata *reqdata, void *udata) {
+  struct fnet_t *conn = reqdata->connection;
 
   struct llistener *listener      = listeners;
   struct llistener *prev_listener = NULL;
@@ -332,12 +347,12 @@ void jerry_register(const char *path) {
 }
 
 void jerry_join(const char *url) {
-  char *target = url;
-  const char *mode;
+  char *target = (char *)url;
+  /* const char *mode; */
 
   if (strstr(target, "http://") == target) {
     target += 7;
-    mode    = "http";
+    /* mode    = "http"; */
   /* } else if (strstr(target, "tcp://") == target) { */
   /*   target += 6;*/ 
   /*   mode    = "tcp"; */

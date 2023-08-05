@@ -8,7 +8,7 @@ void jerry_join(const char *url);
 
 // Server, http mode
 void jerry_register(const char *path);
-void jerry_onClose(struct hs_udata *hsdata, void *udata);
+void jerry_onClose(struct http_server_reqdata *reqdata, void *udata);
 
 // // Server, tcp mode
 // void jerry_listen(int port);

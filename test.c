@@ -5,7 +5,7 @@
 #include "finwo/http-parser.h"
 #include "finwo/http-server.h"
 
-#include "finwo/jerry.h"
+#include "jerry.h"
 
 void onServing(const char *addr, uint16_t port, void *udata) {
   printf("Serving at %s:%d\n", addr, port);
