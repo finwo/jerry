@@ -9,6 +9,7 @@
 #include "kgabis/parson.h"
 #include "orlp/ed25519.h"
 #include "finwo/fnet.h"
+#include "jacketizer/yuarel.h"
 #include "tidwall/buf.h"
 
 #include "jerry.h"
@@ -346,20 +347,103 @@ void jerry_register(const char *path) {
   http_server_route("OPTIONS", path, jerry_route_options);
 }
 
-void jerry_join(const char *url) {
-  char *target = (char *)url;
-  /* const char *mode; */
+void _jerry_join_onConnect(struct fnet_ev *ev) {
+  struct http_parser_pair *reqres = ev->udata;
+  printf("onConnect\n");
 
-  if (strstr(target, "http://") == target) {
-    target += 7;
-    /* mode    = "http"; */
-  /* } else if (strstr(target, "tcp://") == target) { */
-  /*   target += 6;*/ 
-  /*   mode    = "tcp"; */
-  } else {
-    fprintf(stderr, "Unsupported target url: %s\n", target);
+  struct buf *req = http_parser_sprint_pair_request(reqres);
+  int e = fnet_write(ev->connection, req);
+
+  printf("p: %p\ne: %d\n", req, e);
+
+  /* char *reqstr = calloc(req->len + 1, sizeof(char)); */
+  /* memcpy(reqstr, req->data, req->len); */
+
+  /* printf("---[ START REQUEST ]---\n%s\n---[ END REQUEST ]---\n", reqstr); */
+
+  buf_clear(req);
+  free(req);
+
+  printf("onConnect\n");
+}
+
+void _jerry_join_onClose(struct fnet_ev *ev) {
+  printf("onClose\n");
+}
+
+void jerry_join(const char *url) {
+  int isSupported = 0;
+  char *urlcopy = strdup(url);
+  struct yuarel parsed;
+
+  yuarel_parse(&parsed, urlcopy);
+
+  // TODO: clean this up (http-client lib with streamed body support?)
+
+  // http fallback port
+  if ((!strcmp(parsed.scheme, "http")) && (!parsed.port)) {
+    parsed.port = 80;
+  }
+  if ((!strcmp(parsed.scheme, "tcp")) && (!parsed.port)) {
+    parsed.port = 80;
+  }
+
+  if (
+    (!strcmp(parsed.scheme, "http")) ||
+    (!strcmp(parsed.scheme, "tcp"))
+  ) {
+    isSupported = 1;
+  }
+
+  if (!isSupported) {
+    fprintf(stderr, "Only http/tcp connections supported\n");
+    exit(1);
+  }
+  if (!parsed.host) {
+    fprintf(stderr, "Missing host in url\n");
     exit(1);
   }
 
-  fprintf(stderr, "Join feature not implemented yet\n");
+  struct http_parser_pair *reqres = http_parser_pair_init(NULL);
+  http_parser_header_set(reqres->request, "Host", parsed.host);
+  reqres->request->version = strdup("1.1");
+  reqres->request->method  = strdup("GET");
+
+  if (parsed.path ) reqres->request->path  = strdup(parsed.path);
+  if (parsed.query) reqres->request->query = strdup(parsed.query);
+
+  struct fnet_t *conn = fnet_connect(parsed.host, parsed.port, &((struct fnet_options_t){
+    .proto     = FNET_PROTO_TCP,
+    .flags     = 0,
+    .onConnect = _jerry_join_onConnect,
+    .onData    = NULL,                  // TODO: receive response
+    .onTick    = NULL,
+    .onClose   = _jerry_join_onClose,   // TODO: cleanup
+    .udata     = reqres,
+  }));
+
+  printf("Scheme  : %s\n", parsed.scheme);
+  printf("Host    : %s\n", parsed.host);
+  printf("Port    : %d\n", parsed.port);
+  printf("Path    : %s\n", parsed.path);
+  printf("Query   : %s\n", parsed.query);
+  printf("Fragment: %s\n", parsed.fragment);
+  printf("Username: %s\n", parsed.username);
+  printf("Password: %s\n", parsed.password);
+
+  free(urlcopy);
+
+
+  /* if (strstr(target, "http://") == target) { */
+  /*   target += 7; */
+  /*   mode    = "http"; */
+  /* /1* } else if (strstr(target, "tcp://") == target) { *1/ */
+  /* /1* target += 6; *1/ */
+  /* /1*   mode    = "tcp"; *1/ */
+  /* } else { */
+  /*   fprintf(stderr, "Unsupported target url: %s\n", target); */
+  /*   exit(1); */
+  /* } */
+
+  /* fprintf(stderr, "Join feature not implemented yet\n"); */
 }

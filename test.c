@@ -63,11 +63,11 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    /* if (!strcmp("--join", argv[i])) { */
-    /*   i++; */
-    /*   jerry_join(argv[i]); */
-    /*   continue; */
-    /* } */
+    if (!strcmp("--join", argv[i])) {
+      i++;
+      jerry_join(argv[i]);
+      continue;
+    }
 
   }
 
