@@ -6,6 +6,7 @@
 #include "finwo/http-server.h"
 #include "finwo/http-parser.h"
 #include "finwo/mindex.h"
+#include "finwo/strnstr.h"
 #include "kgabis/parson.h"
 #include "orlp/ed25519.h"
 #include "finwo/fnet.h"
@@ -22,6 +23,11 @@ struct llistener {
 struct dedup_entry {
   char *pubkey;
   uint16_t seq;
+};
+
+struct http_resp_udata {
+  struct fnet_t *conn;
+  struct buf    *buffer;
 };
 
 struct llistener *listeners = NULL;
@@ -349,22 +355,36 @@ void jerry_register(const char *path) {
 
 void _jerry_join_onConnect(struct fnet_ev *ev) {
   struct http_parser_pair *reqres = ev->udata;
-  printf("onConnect\n");
-
   struct buf *req = http_parser_sprint_pair_request(reqres);
   int e = fnet_write(ev->connection, req);
-
-  printf("p: %p\ne: %d\n", req, e);
-
-  /* char *reqstr = calloc(req->len + 1, sizeof(char)); */
-  /* memcpy(reqstr, req->data, req->len); */
-
-  /* printf("---[ START REQUEST ]---\n%s\n---[ END REQUEST ]---\n", reqstr); */
-
   buf_clear(req);
   free(req);
+}
 
-  printf("onConnect\n");
+void _jerry_join_onData(struct fnet_ev *ev) {
+  struct http_parser_pair *reqres = ev->udata;
+  http_parser_pair_response_data(reqres, ev->buffer);
+  printf("onData: %*s\n", ev->buffer->len, ev->buffer->data);
+}
+
+void _jerry_join_onChunk(struct http_parser_event *ev) {
+  char *index;
+  struct http_resp_udata *dat = ev->udata;
+  buf_append(dat->buffer, ev->chunk->data, ev->chunk->len);
+
+  // Split by first newline
+  if (!(index = strnstr(dat->buffer->data, "\n", dat->buffer->len))) {
+    // No newline = no json document
+    return;
+  }
+  *(index) = "\0";
+
+
+  printf("onChunk: nice\n");
+}
+
+void _jerry_join_onResponse(struct fnet_ev *ev) {
+  printf("onResponse: death expected.. Reconnect?\n");
 }
 
 void _jerry_join_onClose(struct fnet_ev *ev) {
@@ -406,8 +426,14 @@ void jerry_join(const char *url) {
 
   struct http_parser_pair *reqres = http_parser_pair_init(NULL);
   http_parser_header_set(reqres->request, "Host", parsed.host);
-  reqres->request->version = strdup("1.1");
-  reqres->request->method  = strdup("GET");
+  reqres->request->version  = strdup("1.1");
+  reqres->request->method   = strdup("GET");
+
+  reqres->response->onChunk = _jerry_join_onChunk;
+  reqres->response->udata   = calloc(1, sizeof(struct http_resp_udata));
+  reqres->onResponse        = _jerry_join_onResponse;
+
+  ((struct http_resp_udata *)(reqres->response->udata))->buffer = calloc(1, sizeof(struct buf));
 
   if (parsed.path ) reqres->request->path  = strdup(parsed.path);
   if (parsed.query) reqres->request->query = strdup(parsed.query);
@@ -416,9 +442,9 @@ void jerry_join(const char *url) {
     .proto     = FNET_PROTO_TCP,
     .flags     = 0,
     .onConnect = _jerry_join_onConnect,
-    .onData    = NULL,                  // TODO: receive response
+    .onData    = _jerry_join_onData,
     .onTick    = NULL,
-    .onClose   = _jerry_join_onClose,   // TODO: cleanup
+    .onClose   = _jerry_join_onClose,
     .udata     = reqres,
   }));
 

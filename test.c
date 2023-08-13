@@ -8,7 +8,7 @@
 #include "jerry.h"
 
 void onServing(const char *addr, uint16_t port, void *udata) {
-  printf("Serving at %s:%d\n", addr, port);
+  printf("\nServing at %s:%d\n", addr, port);
 }
 
 void route_get_hello(struct http_server_reqdata *reqdata) {
