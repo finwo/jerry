@@ -90,6 +90,15 @@ void _jerry_respond_error(
   fnet_close(reqdata->connection);
 }
 
+JERRY_RETURNCODE jerry_ev_free(struct jerry_ev *ev) {
+  if (!ev) return JERRY_RETURNCODE_OK;
+  if (ev->publicKey) free(ev->publicKey);
+  if (ev->body     ) free(ev->body     );
+  if (ev->signature) free(ev->signature);
+  free(ev);
+  return JERRY_RETURNCODE_OK;
+}
+
 void jerry_route_options(struct http_server_reqdata *reqdata) {
 
   // Create easy references

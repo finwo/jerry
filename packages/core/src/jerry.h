@@ -3,6 +3,19 @@
 
 #include "finwo/http-server.h"
 
+#define JERRY_RETURNCODE               int
+#define JERRY_RETURNCODE_OK            0
+#define JERRY_RETURNCODE_ERROR_GENERIC -1
+
+struct jerry_ev {
+  char     *publicKey;
+  char     *body;
+  uint16_t sequence;
+  char     *signature;
+};
+
+void jerry_ev_free(struct jerry_ev *ev);
+
 // Client, supports http only (for now)
 void jerry_join(const char *url);
 
